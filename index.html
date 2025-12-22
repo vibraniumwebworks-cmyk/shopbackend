@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trichy Sweet Shop | Retail POS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        :root { --primary: #FF8C00; --secondary: #2D3748; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; background-color: #333; }
+        #bgVideo { position: fixed; right: 0; bottom: 0; min-width: 100%; min-height: 100%; z-index: -100; object-fit: cover; }
+        .video-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); z-index: -99; }
+        .hide { display: none !important; } .show-flex { display: flex !important; }
+        
+        .app-container { display: grid; height: 100vh; grid-template-columns: 1fr 450px; }
+        .products-section { padding: 25px; overflow-y: auto; }
+        
+        /* HEADER & SEARCH */
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding: 15px 25px; border-radius: 15px; background: rgba(255, 255, 255, 0.95); gap: 15px; flex-wrap: wrap; }
+        h1 { font-family: 'Poppins', sans-serif; font-size: 1.8rem; color: var(--primary); white-space: nowrap; }
+        .search-container { flex-grow: 1; max-width: 400px; }
+        .search-input { width: 100%; padding: 12px; border-radius: 30px; border: 2px solid #e2e8f0; outline: none; }
+        .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; }
+        .product-card { background: rgba(255, 255, 255, 0.95); border-radius: 16px; padding: 15px; text-align: center; cursor: pointer; transition: 0.3s; }
+        .product-card:hover { transform: translateY(-5px); border-color: var(--primary); }
+        .product-card img { width: 100px; height: 100px; object-fit: cover; border-radius: 50%; margin-bottom: 10px; border: 3px solid #f7fafc; }
+        .add-btn { background: var(--secondary); color: white; border: none; padding: 8px 0; border-radius: 50px; width: 100%; margin-top: 10px; cursor: pointer; }
+        
+        .nav-btn { padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-left: 10px; border:none; color: white;}
+        .btn-custom { background: #4A5568; } 
+        .btn-bulk { background: #6b46c1; } 
+        .btn-admin { background: #2b6cb0; } 
+
+        .billing-section { background: rgba(255, 255, 255, 0.98); display: flex; flex-direction: column; padding: 25px; border-left: 1px solid #e2e8f0; height: 100%; }
+        .bill-items { flex-grow: 1; overflow-y: auto; background: #f8fafc; border-radius: 12px; padding: 10px; margin: 15px 0; border: 1px solid #edf2f7; }
+        .bill-row { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: white; margin-bottom: 8px; border-radius: 8px; }
+        
+        .totals-area { background: #edf2f7; padding: 20px; border-radius: 12px; }
+        .total-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.95rem; align-items: center; }
+        .grand-total { font-size: 1.4rem; color: var(--primary); font-weight: 800; border-top: 1px dashed #cbd5e0; padding-top: 10px; }
+        .disc-input { width: 80px; padding: 5px; border: 1px solid #ccc; border-radius: 5px; text-align: right; }
+
+        .pdf-btn { width: 100%; padding: 15px; background: #25D366; color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 1.1rem; cursor: pointer; margin-top: 15px; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 3000; display: none; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 30px; border-radius: 20px; width: 400px; text-align: center; }
+        .weight-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px 0; }
+        .weight-btn { padding: 12px; border: 2px solid #edf2f7; background: white; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        .weight-btn:hover { border-color: var(--primary); color: var(--primary); }
+    </style>
+</head>
+<body>
+    <video autoplay muted loop id="bgVideo"><source src="video1.mp4" type="video/mp4"></video>
+    <div class="video-overlay"></div>
+
+    <div id="qtyModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="modalProdName">Select Quantity</h3>
+            <p>Price: ₹<span id="modalProdPrice">0</span> / <span id="modalProdUnit">kg</span></p>
+            <div id="weightOptions" class="hide">
+                <div class="weight-grid">
+                    <button class="weight-btn" onclick="addToCartWeight(100)">100g</button>
+                    <button class="weight-btn" onclick="addToCartWeight(250)">250g</button>
+                    <button class="weight-btn" onclick="addToCartWeight(500)">500g</button>
+                    <button class="weight-btn" onclick="addToCartWeight(1000)">1 Kg</button>
+                </div>
+                <input type="number" id="customGrams" placeholder="Custom grams" style="width:100%; padding:10px; margin:10px 0;">
+                <button class="weight-btn" style="width:100%" onclick="addToCartWeight('custom')">Add Custom</button>
+            </div>
+            <div id="pieceOptions" class="hide" style="margin:20px 0;">
+                <input type="number" id="pieceDisplay" value="1" min="1" style="width:60px; padding:10px; font-size:1.5rem; text-align:center;">
+                <br><br>
+                <button class="add-btn" onclick="addToCartPieces()">Add to Cart</button>
+            </div>
+            <button style="margin-top:15px; border:none; background:none; color:red; cursor:pointer;" onclick="closeModal()">Cancel</button>
+        </div>
+    </div>
+
+    <div id="customItemModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Add Open Item</h3>
+            <input type="text" id="cName" placeholder="Item Name" style="width:100%; padding:10px; margin-bottom:10px;">
+            <input type="number" id="cPrice" placeholder="Total Price" style="width:100%; padding:10px; margin-bottom:10px;">
+            <button class="add-btn" onclick="addCustomToCart()">Add to Bill</button>
+            <button style="margin-top:15px; border:none; background:none; color:red; cursor:pointer;" onclick="closeCustomModal()">Cancel</button>
+        </div>
+    </div>
+
+    <div class="app-container">
+        <main class="products-section">
+            <div class="header-bar">
+                <h1>🍬 Retail POS</h1>
+                <div class="search-container">
+                    <input type="text" id="searchBar" class="search-input" placeholder="Search..." onkeyup="filterCatalog()">
+                </div>
+                <div>
+                    <button class="nav-btn btn-custom" onclick="openCustomModal()">➕ Custom</button>
+                    <button class="nav-btn btn-bulk" onclick="window.location.href='bulk_order.html'">📦 Bulk</button>
+                    <button class="nav-btn btn-admin" onclick="window.location.href='admin.html'">📊 Admin</button>
+                </div>
+            </div>
+            <div id="catalogContainer">Loading Products...</div>
+        </main>
+
+        <aside class="billing-section">
+            <h2>🧾 Invoice</h2>
+            <input type="text" id="custName" placeholder="Customer Name" style="width:100%; padding:10px; margin:10px 0;">
+            <input type="tel" id="custPhone" placeholder="Mobile / WhatsApp" style="width:100%; padding:10px; margin-bottom:10px;">
+            
+            <div class="bill-items" id="billItems"></div>
+            
+            <div class="totals-area">
+                <div class="total-row"><span>Subtotal:</span><span>₹<span id="subtotal">0.00</span></span></div>
+                
+                <div class="total-row">
+                    <span>Discount (%):</span>
+                    <input type="number" id="discPer" class="disc-input" placeholder="%" oninput="updateTotals()">
+                </div>
+                
+                <div class="total-row">
+                    <span>Discount (₹):</span>
+                    <input type="number" id="discAmt" class="disc-input" placeholder="₹" oninput="updateTotals()">
+                </div>
+
+                <div class="total-row grand-total"><span>Total Payable:</span><span>₹<span id="total">0.00</span></span></div>
+            </div>
+            
+            <button class="pdf-btn" onclick="shareInvoice()">📱 Print & Save</button>
+        </aside>
+    </div>
+
+    <script>
+        // ✅ YOUR RENDER BACKEND
+        const BACKEND_URL = "https://shopbackend-v43a.onrender.com"; 
+        let products = [], cart = [], currentItem = null;
+
+        window.onload = async function() {
+            try {
+                const res = await fetch(`${BACKEND_URL}/api/products`);
+                products = await res.json();
+                renderCatalog();
+            } catch(e) { document.getElementById('catalogContainer').innerHTML = "Error loading products. Server might be sleeping."; }
+        };
+
+        function renderCatalog() {
+            let html = '<div class="products-grid">';
+            products.forEach(p => {
+                const img = p.image.startsWith('/uploads') ? `${BACKEND_URL}${p.image}` : p.image;
+                html += `
+                <div class="product-card" onclick="openModal(${p.id})">
+                    <img src="${img}" onerror="this.src='https://via.placeholder.com/100'">
+                    <h4>${p.name}</h4>
+                    <div style="color:var(--primary); font-weight:bold;">₹${p.price}/${p.unit}</div>
+                </div>`;
+            });
+            html += '</div>';
+            document.getElementById('catalogContainer').innerHTML = html;
+        }
+
+        function filterCatalog() {
+            const q = document.getElementById('searchBar').value.toLowerCase();
+            const filtered = products.filter(p => p.name.toLowerCase().includes(q));
+            let html = '<div class="products-grid">';
+            filtered.forEach(p => {
+                const img = p.image.startsWith('/uploads') ? `${BACKEND_URL}${p.image}` : p.image;
+                html += `<div class="product-card" onclick="openModal(${p.id})">
+                    <img src="${img}"><h4>${p.name}</h4><div>₹${p.price}</div></div>`;
+            });
+            html += '</div>';
+            document.getElementById('catalogContainer').innerHTML = html;
+        }
+
+        function openModal(id) {
+            currentItem = products.find(p => p.id === id);
+            document.getElementById('qtyModal').classList.add('show-flex');
+            document.getElementById('modalProdName').innerText = currentItem.name;
+            document.getElementById('modalProdPrice').innerText = currentItem.price;
+            document.getElementById('modalProdUnit').innerText = currentItem.unit;
+            
+            if(currentItem.unit === 'kg') {
+                document.getElementById('weightOptions').classList.remove('hide');
+                document.getElementById('pieceOptions').classList.add('hide');
+            } else {
+                document.getElementById('weightOptions').classList.add('hide');
+                document.getElementById('pieceOptions').classList.remove('hide');
+            }
+        }
+
+        function closeModal() { document.getElementById('qtyModal').classList.remove('show-flex'); }
+        function openCustomModal() { document.getElementById('customItemModal').classList.add('show-flex'); }
+        function closeCustomModal() { document.getElementById('customItemModal').classList.remove('show-flex'); }
+
+        function addToCartWeight(grams) {
+            if(grams === 'custom') grams = parseFloat(document.getElementById('customGrams').value);
+            if(!grams) return;
+            const price = (currentItem.price / 1000) * grams;
+            cart.push({ ...currentItem, qty: grams, type: 'g', totalPrice: price });
+            closeModal(); renderBill();
+        }
+
+        function addToCartPieces() {
+            const qty = parseInt(document.getElementById('pieceDisplay').value);
+            const price = currentItem.price * qty;
+            cart.push({ ...currentItem, qty: qty, type: 'pc', totalPrice: price });
+            closeModal(); renderBill();
+        }
+
+        function addCustomToCart() {
+            const name = document.getElementById('cName').value;
+            const price = parseFloat(document.getElementById('cPrice').value);
+            if(name && price) {
+                cart.push({ name, qty: 1, type: 'unit', totalPrice: price });
+                closeCustomModal(); renderBill();
+            }
+        }
+
+        function renderBill() {
+            document.getElementById('billItems').innerHTML = cart.map((item, i) => `
+                <div class="bill-row">
+                    <div>${item.name} <small>(${item.qty}${item.type})</small></div>
+                    <div style="text-align:right;">
+                        <div>₹${item.totalPrice.toFixed(2)}</div>
+                        <small style="color:red; cursor:pointer;" onclick="removeItem(${i})">Remove</small>
+                    </div>
+                </div>`).join('');
+            
+            updateTotals();
+        }
+
+        function removeItem(i) {
+            cart.splice(i, 1);
+            renderBill();
+        }
+
+        function updateTotals() {
+            const subtotal = cart.reduce((a,b) => a + b.totalPrice, 0);
+            let discPer = parseFloat(document.getElementById('discPer').value) || 0;
+            let discAmt = parseFloat(document.getElementById('discAmt').value) || 0;
+            let discountValue = (subtotal * discPer / 100) + discAmt;
+            let total = subtotal - discountValue;
+            if(total < 0) total = 0;
+
+            document.getElementById('subtotal').innerText = subtotal.toFixed(2);
+            document.getElementById('total').innerText = total.toFixed(2);
+        }
+
+        async function shareInvoice() {
+            if(cart.length === 0) return alert("Cart is empty!");
+
+            // ✅ CHECK IF PDF LIB LOADED
+            if(!window.jspdf) return alert("Error: PDF Library not loaded. Check internet connection.");
+            
+            const subtotal = parseFloat(document.getElementById('subtotal').innerText);
+            const total = parseFloat(document.getElementById('total').innerText);
+            const discount = subtotal - total;
+
+            const orderData = {
+                customer_name: document.getElementById('custName').value || "Walk-in",
+                customer_phone: document.getElementById('custPhone').value || "",
+                customer_address: "",
+                items: cart,
+                total_amount: total,
+                paid_amount: total,
+                due_amount: 0,
+                order_type: "Retail"
+            };
+
+            const btn = document.querySelector('.pdf-btn');
+            btn.innerText = "⏳ Saving...";
+            btn.disabled = true;
+            
+            try {
+                // ✅ SEND TO BACKEND
+                const res = await fetch(`${BACKEND_URL}/api/orders`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(orderData)
+                });
+                
+                if(!res.ok) throw new Error("Server Save Failed");
+                const data = await res.json();
+                
+                // ✅ GENERATE PDF
+                generatePDF(orderData, data.orderId, subtotal, discount);
+                alert("✅ Saved & Printed!");
+                
+                cart = []; 
+                document.getElementById('discPer').value = '';
+                document.getElementById('discAmt').value = '';
+                document.getElementById('custName').value = '';
+                document.getElementById('custPhone').value = '';
+                renderBill();
+
+            } catch(e) {
+                console.error(e);
+                alert("❌ Error: " + e.message);
+            } finally {
+                btn.innerText = "📱 Print & Save";
+                btn.disabled = false;
+            }
+        }
+
+        function generatePDF(order, id, subtotal, discount) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            doc.setFontSize(18); doc.text("TRICHY SWEETS", 105, 20, {align:'center'});
+            doc.setFontSize(12); doc.text("Retail Invoice", 105, 28, {align:'center'});
+            
+            doc.text(`Order #${id}`, 10, 40);
+            doc.text(`Date: ${new Date().toLocaleDateString()}`, 150, 40);
+            doc.text(`Customer: ${order.customer_name}`, 10, 48);
+
+            let y = 60;
+            doc.line(10, 55, 200, 55); 
+            
+            order.items.forEach(i => {
+                doc.text(`${i.name} (${i.qty}${i.type})`, 10, y);
+                doc.text(i.totalPrice.toFixed(2), 180, y, {align:'right'});
+                y+=10;
+            });
+
+            doc.line(10, y, 200, y); 
+            y+=10;
+
+            doc.text(`Subtotal:`, 140, y);
+            doc.text(subtotal.toFixed(2), 190, y, {align:'right'}); 
+            
+            if(discount > 0) {
+                y+=8;
+                doc.text(`Discount:`, 140, y);
+                doc.text(`- ${discount.toFixed(2)}`, 190, y, {align:'right'});
+            }
+
+            y+=10;
+            doc.setFontSize(14); doc.setFont("helvetica", "bold");
+            doc.text(`Total: Rs. ${order.total_amount.toFixed(2)}`, 140, y);
+
+            doc.save(`Order_${id}.pdf`);
+            
+            if(order.customer_phone) {
+                 const msg = `Hello ${order.customer_name}, Your bill is Rs. ${order.total_amount}. Order #${id}. Thanks!`;
+                 window.open(`https://wa.me/${order.customer_phone}?text=${encodeURIComponent(msg)}`, '_blank');
+            }
+        }
+    </script>
+</body>
+</html>
