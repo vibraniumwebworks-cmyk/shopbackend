@@ -1,5 +1,5 @@
 const express = require('express');
-const Database = require('better-sqlite3'); // CHANGED: Using better-sqlite3
+const Database = require('better-sqlite3'); 
 const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
@@ -20,12 +20,10 @@ if (!fs.existsSync('./uploads')){
 }
 
 // --- 2. DATABASE CONNECTION (SQLite) ---
-// This creates/opens a file named 'trichy.db' automatically
 const db = new Database('trichy.db', { verbose: console.log });
 console.log('✅ Connected to SQLite database (trichy.db)');
 
 // --- 3. CREATE TABLES AUTOMATICALLY ---
-// better-sqlite3 uses .exec() for multiple statements
 db.exec(`
     CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,6 +49,52 @@ db.exec(`
     );
 `);
 
+// --- 4. BULK ADD PRODUCTS (SEEDING) ---
+// This runs automatically if the database is found empty
+const productCount = db.prepare('SELECT count(*) as count FROM products').get();
+
+if (productCount.count === 0) {
+    console.log("⚡ Database is empty. Adding bulk products...");
+
+    const insert = db.prepare('INSERT INTO products (name, price, category, unit, gst, image) VALUES (?, ?, ?, ?, ?, ?)');
+
+    // === YOUR FULL PRODUCT LIST ===
+    const initialProducts = [
+        { name: "Gulab Jamun", price: 600, category: "Sweets", unit: "kg", gst: 5, image: "Gulab jamun.png" },
+        { name: "Gajar Ka Halwa", price: 550, category: "Sweets", unit: "kg", gst: 5, image: "Gajar ka halwa.png" },
+        { name: "Mysore Pak", price: 720, category: "Sweets", unit: "kg", gst: 5, image: "Mysore pak.png" },
+        { name: "Jalebi", price: 400, category: "Sweets", unit: "kg", gst: 5, image: "Jalebi.png" },
+        { name: "Kaju Barfi", price: 900, category: "Sweets", unit: "kg", gst: 5, image: "Barfi.png" },
+        { name: "Tirunelveli Halwa", price: 680, category: "Sweets", unit: "kg", gst: 5, image: "Tirunelveli Halwa.png" },
+        { name: "Srivilliputhur Palkova", price: 480, category: "Sweets", unit: "kg", gst: 5, image: "Srivilliputhur Palkova.png" },
+        { name: "Rasmalai", price: 650, category: "Sweets", unit: "kg", gst: 5, image: "/uploads/1765866830601.png" },
+        { name: "Coconut Ladoo", price: 400, category: "Sweets", unit: "kg", gst: 5, image: "Coconut ladoo.png" },
+        { name: "Kheer", price: 300, category: "Sweets", unit: "kg", gst: 5, image: "Kheer.png" },
+        { name: "Mixed Sweets & Snacks", price: 500, category: "Sweets", unit: "kg", gst: 5, image: "mix.png" },
+        { name: "Murukku", price: 280, category: "Snacks", unit: "kg", gst: 5, image: "Thenkuzhal Murukku.png" },
+        { name: "Kara Murukku", price: 280, category: "Snacks", unit: "kg", gst: 5, image: "Kara Murukku.png" },
+        { name: "Mixture", price: 320, category: "Snacks", unit: "kg", gst: 5, image: "Spicy Mixture.png" },
+        { name: "Banana Chips", price: 450, category: "Snacks", unit: "kg", gst: 5, image: "Banana Chips.png" },
+        { name: "Kadalai Mittai", price: 260, category: "Snacks", unit: "kg", gst: 5, image: "Kadalai Mittai.png" },
+        { name: "Rusks", price: 220, category: "Snacks", unit: "kg", gst: 5, image: "Rusks.png" },
+        { name: "Veg Puff", price: 25, category: "Snacks", unit: "pc", gst: 5, image: "Veg Puff.png" },
+        { name: "Cookies", price: 350, category: "Snacks", unit: "kg", gst: 5, image: "Cookies.png" },
+        { name: "Chicken Puff", price: 40, category: "Snacks", unit: "pc", gst: 5, image: "chicken puff.png" },
+        { name: "Rose Milk", price: 60, category: "Juices", unit: "pc", gst: 0, image: "Rose Milk.png" },
+        { name: "Badam Milk", price: 70, category: "Juices", unit: "pc", gst: 0, image: "Badam Milk.png" },
+        { name: "Lime Juice", price: 40, category: "Juices", unit: "pc", gst: 0, image: "Lime Juice.png" }
+    ];
+
+    // Use a transaction for fast bulk insertion
+    const insertMany = db.transaction((products) => {
+        for (const p of products) insert.run(p.name, p.price, p.category, p.unit, p.gst, p.image);
+    });
+
+    insertMany(initialProducts);
+    console.log(`✅ Successfully added ${initialProducts.length} products!`);
+}
+
+
 // --- IMAGE UPLOAD CONFIG ---
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -72,7 +116,6 @@ app.get('/', (req, res) => {
 // 1. GET ALL PRODUCTS
 app.get('/api/products', (req, res) => {
     try {
-        // .prepare().all() gets all rows
         const rows = db.prepare('SELECT * FROM products').all();
         res.json(rows);
     } catch (err) {
@@ -124,7 +167,7 @@ app.put('/api/products/:id', upload.single('image'), (req, res) => {
         params.push(id);
 
         const stmt = db.prepare(sql);
-        stmt.run(...params); // Spread the array into arguments
+        stmt.run(...params); 
 
         res.json({ message: 'Product updated' });
     } catch (err) {
@@ -174,7 +217,6 @@ app.put('/api/orders/:id/pay', (req, res) => {
         const { amount } = req.body;
         const id = req.params.id;
 
-        // Transaction ensures data safety
         const payTransaction = db.transaction(() => {
             const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
             if (!order) throw new Error("Order not found");
@@ -195,7 +237,7 @@ app.put('/api/orders/:id/pay', (req, res) => {
     }
 });
 
-// --- 4. DYNAMIC PORT ---
+// --- 5. DYNAMIC PORT ---
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`Server running on Port ${PORT}`);
